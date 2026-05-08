@@ -4,10 +4,6 @@
 
 > **代码完全由 [Claude Code](https://claude.com/claude-code) 写就。** 我（仓库主人）只是把需求讲给 Claude，所有实现、调试、文档、打包都是它做的。
 
-<p align="center">
-  <img src="docs/menubar.png" width="380" alt="状态栏配置面板" />
-</p>
-
 ---
 
 ## ⚠️ 兼容性（必看）
