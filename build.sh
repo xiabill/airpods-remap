@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 APP_NAME="AirPodsRemap"
 APP_BUNDLE="${APP_NAME}.app"
 BUNDLE_ID="com.xiabill.airpods-remap"
-VERSION="1.3.1"
+VERSION="1.3.2"
 
 # 1. 确保图标存在；不存在则现做
 if [[ ! -f AppIcon.icns ]]; then

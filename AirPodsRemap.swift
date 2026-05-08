@@ -288,17 +288,20 @@ final class EventTap: ObservableObject {
         }
     }
 
+    // 关键：始终显式设置 flags（哪怕 0），避免事件继承 hidSystemState
+    // source 的残留修饰键状态。否则 Return 在某些 IM app（微信）上会被
+    // 识别为 Shift/Cmd+Return（换行）而不是发送。
     private func postKeyDown(keyCode: UInt16, flags: UInt64) {
         let src = CGEventSource(stateID: .hidSystemState)
         let down = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true)
-        if flags != 0 { down?.flags = CGEventFlags(rawValue: flags) }
+        down?.flags = CGEventFlags(rawValue: flags)
         down?.post(tap: .cghidEventTap)
     }
 
     private func postKeyUp(keyCode: UInt16, flags: UInt64) {
         let src = CGEventSource(stateID: .hidSystemState)
         let up = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false)
-        if flags != 0 { up?.flags = CGEventFlags(rawValue: flags) }
+        up?.flags = CGEventFlags(rawValue: flags)
         up?.post(tap: .cghidEventTap)
     }
 }
@@ -650,7 +653,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.3.1
+            版本 1.3.2
             """
         alert.runModal()
     }
