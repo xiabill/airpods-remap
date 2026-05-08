@@ -1,0 +1,44 @@
+AirPods Remap — 使用说明（v1.2）
+
+【兼容性】
+✅ AirPods（普通版）/ AirPods 3 / 4 — 单击/双击/三击 stem 都能拦截
+⚠️ AirPods Pro 2 / Pro 3 — 不支持。Apple 改变了 Pro 2 stem 单击的事件路径，
+   走 MediaRemote 私有 IPC，绕过了 CGEventTap，第三方应用无法拦截。
+   Karabiner-Elements、SiriMote 等同类工具对 Pro 2 也都失效。
+
+【安装】
+1. 把 AirPodsRemap.app 拖到 /Applications
+2. 双击启动；若提示「未受信任的开发者」，在访达里右键 → 打开 → 仍要打开
+3. 首次会要求授权辅助功能：
+   系统设置 → 隐私与安全 → 辅助功能 → 找到 AirPodsRemap → 打开开关
+4. 授权后回到状态栏图标，点击「▶ 启动」（或杀掉重开 app）
+
+【日常使用】
+- 状态栏耳机图标：
+  · 左键 = 配置面板
+  · 右键 = 快捷菜单
+- 配置面板里给「单击 / 双击 / 三击」分别选择目标键和触发模式：
+  · 「点按」= 按一下立即按下并释放（适合 ⌘Space、F13 等普通按键）
+  · 「按住」= 按一下按住，再按一下释放（适合 Typeless / WhisperKey 这类
+    长按 Opt 录音的应用）
+- 修改即时生效，自动保存
+- 不用时可点「⏸ 暂停」让 AirPods 恢复原本播放/暂停行为
+- 「开机自启动」开关在配置面板和右键菜单里都有
+
+【与 Typeless / WhisperKey 配合】
+1. Typeless 的快捷键设为「按住 Opt」
+2. AirPodsRemap 单击设为：Left Option ⌥ + 按住模式
+3. 单击 stem → 状态栏图标变红 → 开始录音 → 说话 → 再单击 → 转写并粘贴
+
+【按住模式的安全机制】
+- 状态栏图标在「按住中」时变红，提醒用户当前正按住某键
+- 暂停或退出 app 会自动释放所有按住的键，不会卡住 Opt
+- 万一卡住：在状态栏点暂停或重启 app
+
+【支持的手势】
+单击 / 双击 / 三击（AirPods Pro 是单/双/三捏 force sensor）
+长按由系统占用（Siri / 降噪切换），无法拦截
+
+【卸载】
+退出 app → 删除 /Applications/AirPodsRemap.app
+→ 系统设置 → 辅助功能里移除 AirPodsRemap 的授权

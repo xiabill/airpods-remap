@@ -1,0 +1,21 @@
+# 构建产物
+AirPodsRemap.app/
+dist/
+
+# 图标生成中间产物
+AppIcon.iconset/
+make-icon
+
+# macOS
+.DS_Store
+
+# 调试日志
+/tmp/airpods.log
+
+# 旧版残留（如果有人 checkout 老 commit）
+main.swift
+airpods-remap
+
+# Xcode 用户数据（虽然我们不用 xcode build，万一以后开 xcodeproj）
+*.xcuserstate
+*.xcuserdatad/
