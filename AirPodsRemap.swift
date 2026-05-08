@@ -34,10 +34,22 @@ let keyChoices: [KeyChoice] = [
     .init(id: "f19", label: "F19", keyCode:  80, flags: 0),
     .init(id: "f20", label: "F20", keyCode:  90, flags: 0),
 
-    .init(id: "space",  label: "Space",  keyCode: 49, flags: 0),
-    .init(id: "return", label: "Return", keyCode: 36, flags: 0),
-    .init(id: "esc",    label: "Escape", keyCode: 53, flags: 0),
-    .init(id: "tab",    label: "Tab",    keyCode: 48, flags: 0),
+    .init(id: "space",  label: "Space 空格",       keyCode: 49, flags: 0),
+    .init(id: "return", label: "Return / Enter ↵", keyCode: 36, flags: 0),
+    .init(id: "esc",    label: "Escape",           keyCode: 53, flags: 0),
+    .init(id: "tab",    label: "Tab",              keyCode: 48, flags: 0),
+
+    // 数字键 0–9
+    .init(id: "n1", label: "1", keyCode: 18, flags: 0),
+    .init(id: "n2", label: "2", keyCode: 19, flags: 0),
+    .init(id: "n3", label: "3", keyCode: 20, flags: 0),
+    .init(id: "n4", label: "4", keyCode: 21, flags: 0),
+    .init(id: "n5", label: "5", keyCode: 23, flags: 0),
+    .init(id: "n6", label: "6", keyCode: 22, flags: 0),
+    .init(id: "n7", label: "7", keyCode: 26, flags: 0),
+    .init(id: "n8", label: "8", keyCode: 28, flags: 0),
+    .init(id: "n9", label: "9", keyCode: 25, flags: 0),
+    .init(id: "n0", label: "0", keyCode: 29, flags: 0),
 
     .init(id: "cmd-space",   label: "⌘ Space (Spotlight)",
           keyCode: 49, flags: UInt64(CGEventFlags.maskCommand.rawValue)),
@@ -638,7 +650,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.3
+            版本 1.3.1
             """
         alert.runModal()
     }

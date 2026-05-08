@@ -1,9 +1,9 @@
-AirPods Remap — 使用说明（v1.3）
+AirPods Remap — 使用说明（v1.3.1）
 
 【兼容性】
-✅ AirPods（普通版）/ AirPods 3 / 4 — 单击/双击/三击 stem 都能拦截
-⚠️ AirPods Pro 2 / Pro 3 — 不支持。Apple 改变了 Pro 2 stem 单击的事件路径，
-   走 MediaRemote 私有 IPC，绕过了 CGEventTap，第三方应用无法拦截。
+✅ AirPods（普通版）/ AirPods 3 / 4 / Max — 单击/双击/三击 + 音量+/- 都能拦截
+❌ AirPods Pro 2 / Pro 3 — 实测不支持。Apple 把 Pro 2 的 stem 事件全部路由
+   到 MediaRemote 私有 IPC，绕过了 CGEventTap。包括音量+/- 也拦不到。
    Karabiner-Elements、SiriMote 等同类工具对 Pro 2 也都失效。
 
 【安装】
@@ -36,8 +36,8 @@ AirPods Remap — 使用说明（v1.3）
 - 万一卡住：在状态栏点暂停或重启 app
 
 【支持的手势】
-单击 / 双击 / 三击（AirPods Pro 是单/双/三捏 force sensor）
-音量+ / 音量-（AirPods Pro 2 stem 上下滑 — 默认关闭，开启后会失去 AirPods 调音量能力）
+单击 / 双击 / 三击（AirPods Pro 1 是单/双/三捏 force sensor）
+音量+ / 音量-（默认关闭，启用后会失去 AirPods 调音量能力）
 长按由系统占用（Siri / 降噪切换），无法拦截
 
 【卸载】

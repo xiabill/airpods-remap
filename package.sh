@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="AirPodsRemap"
 APP_BUNDLE="${APP_NAME}.app"
-VERSION="1.3"
+VERSION="1.3.1"
 DIST_DIR="dist"
 PAYLOAD_DIR="${DIST_DIR}/${APP_NAME}-${VERSION}"
 ZIP_PATH="${DIST_DIR}/${APP_NAME}-${VERSION}.zip"
