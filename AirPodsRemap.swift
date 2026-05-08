@@ -155,6 +155,21 @@ private let NX_KEYTYPE_PLAY:       Int32 = 16
 private let NX_KEYTYPE_NEXT:       Int32 = 17
 private let NX_KEYTYPE_PREVIOUS:   Int32 = 19
 
+/// 修饰键 keyCode → 对应的 CGEventFlags mask。
+/// 关键：CGEvent post 修饰键时，flags 必须包含对应 mask 系统才认为它真的"按下"。
+/// 否则系统看到 keyCode 但 modifier 状态不变 —— Typeless 这种监听 Opt 状态的应用就收不到。
+private let modifierKeyMask: [UInt16: CGEventFlags] = [
+    58: .maskAlternate,    // Left Option ⌥
+    61: .maskAlternate,    // Right Option ⌥
+    55: .maskCommand,      // Left Command ⌘
+    54: .maskCommand,      // Right Command ⌘
+    59: .maskControl,      // Left Control ⌃
+    62: .maskControl,      // Right Control ⌃
+    56: .maskShift,        // Left Shift ⇧
+    60: .maskShift,        // Right Shift ⇧
+    63: .maskSecondaryFn,  // Fn
+]
+
 final class EventTap: ObservableObject {
     static let shared = EventTap()
 
@@ -288,19 +303,28 @@ final class EventTap: ObservableObject {
         }
     }
 
-    // 关键：始终显式设置 flags（哪怕 0），避免事件继承 hidSystemState
+    // 关键 1：始终显式设置 flags（哪怕 0），避免事件继承 hidSystemState
     // source 的残留修饰键状态。否则 Return 在某些 IM app（微信）上会被
     // 识别为 Shift/Cmd+Return（换行）而不是发送。
+    //
+    // 关键 2：post 修饰键（Opt/Cmd/Shift/Ctrl/Fn）时，flags 必须包含对应
+    // 的 modifier mask，否则系统不认为修饰键真的被按下。Typeless 这种监听
+    // Opt 状态的应用就收不到事件。释放时 mask 必须从 flags 移除。
     private func postKeyDown(keyCode: UInt16, flags: UInt64) {
         let src = CGEventSource(stateID: .hidSystemState)
         let down = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true)
-        down?.flags = CGEventFlags(rawValue: flags)
+        var f = CGEventFlags(rawValue: flags)
+        if let modMask = modifierKeyMask[keyCode] {
+            f.insert(modMask)
+        }
+        down?.flags = f
         down?.post(tap: .cghidEventTap)
     }
 
     private func postKeyUp(keyCode: UInt16, flags: UInt64) {
         let src = CGEventSource(stateID: .hidSystemState)
         let up = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false)
+        // keyUp 时不加 modifier mask（释放修饰键状态）
         up?.flags = CGEventFlags(rawValue: flags)
         up?.post(tap: .cghidEventTap)
     }
@@ -613,13 +637,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        // 关于 / 退出
+        // 关于 / 重启 / 退出
         let about = NSMenuItem(
             title: "关于 AirPods Remap",
             action: #selector(menuAbout),
             keyEquivalent: "")
         about.target = self
         menu.addItem(about)
+
+        let restart = NSMenuItem(
+            title: "重新启动",
+            action: #selector(menuRestart),
+            keyEquivalent: "r")
+        restart.target = self
+        menu.addItem(restart)
 
         let quit = NSMenuItem(
             title: "退出",
@@ -653,9 +684,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.3.2
+            版本 1.3.3
             """
         alert.runModal()
+    }
+    @objc private func menuRestart() {
+        // 先 spawn 一个 detached shell：sleep 0.5s 再 open 自己；然后退出当前进程
+        let bundlePath = Bundle.main.bundlePath
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", "sleep 0.5 && open \"\(bundlePath)\""]
+        try? task.run()
+        NSApp.terminate(nil)
     }
     @objc private func menuQuit() { NSApp.terminate(nil) }
 
