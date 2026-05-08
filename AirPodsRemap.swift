@@ -90,25 +90,37 @@ final class Config: ObservableObject {
     @Published var single: GestureMapping { didSet { save() } }
     @Published var double: GestureMapping { didSet { save() } }
     @Published var triple: GestureMapping { didSet { save() } }
+    // 音量+/- 默认禁用 —— 启用后会失去 AirPods 调音量能力
+    @Published var volumeUp:   GestureMapping { didSet { save() } }
+    @Published var volumeDown: GestureMapping { didSet { save() } }
 
     private init() {
         // 默认：单击 = 按住 Opt（用于 Typeless：按一下开始录音，再按一下结束）
         var s = GestureMapping(enabled: true,  keyChoiceId: "lopt", mode: .holdToggle)
         var d = GestureMapping(enabled: false, keyChoiceId: "f14")
         var t = GestureMapping(enabled: false, keyChoiceId: "f15")
+        var vu = GestureMapping(enabled: false, keyChoiceId: "f16")
+        var vd = GestureMapping(enabled: false, keyChoiceId: "f17")
         if let data = UserDefaults.standard.data(forKey: storeKey),
            let dict = try? JSONDecoder().decode([String: GestureMapping].self, from: data) {
-            if let v = dict["single"] { s = v }
-            if let v = dict["double"] { d = v }
-            if let v = dict["triple"] { t = v }
+            if let v = dict["single"]     { s = v }
+            if let v = dict["double"]     { d = v }
+            if let v = dict["triple"]     { t = v }
+            if let v = dict["volumeUp"]   { vu = v }
+            if let v = dict["volumeDown"] { vd = v }
         }
         self.single = s
         self.double = d
         self.triple = t
+        self.volumeUp = vu
+        self.volumeDown = vd
     }
 
     private func save() {
-        let dict: [String: GestureMapping] = ["single": single, "double": double, "triple": triple]
+        let dict: [String: GestureMapping] = [
+            "single": single, "double": double, "triple": triple,
+            "volumeUp": volumeUp, "volumeDown": volumeDown,
+        ]
         if let data = try? JSONEncoder().encode(dict) {
             UserDefaults.standard.set(data, forKey: storeKey)
         }
@@ -118,14 +130,18 @@ final class Config: ObservableObject {
         single = GestureMapping(enabled: true,  keyChoiceId: "lopt", mode: .holdToggle)
         double = GestureMapping(enabled: false, keyChoiceId: "f14")
         triple = GestureMapping(enabled: false, keyChoiceId: "f15")
+        volumeUp   = GestureMapping(enabled: false, keyChoiceId: "f16")
+        volumeDown = GestureMapping(enabled: false, keyChoiceId: "f17")
     }
 }
 
 // MARK: - Event Tap
 
-private let NX_KEYTYPE_PLAY:     Int32 = 16
-private let NX_KEYTYPE_NEXT:     Int32 = 17
-private let NX_KEYTYPE_PREVIOUS: Int32 = 19
+private let NX_KEYTYPE_SOUND_UP:   Int32 =  0
+private let NX_KEYTYPE_SOUND_DOWN: Int32 =  1
+private let NX_KEYTYPE_PLAY:       Int32 = 16
+private let NX_KEYTYPE_NEXT:       Int32 = 17
+private let NX_KEYTYPE_PREVIOUS:   Int32 = 19
 
 final class EventTap: ObservableObject {
     static let shared = EventTap()
@@ -216,12 +232,15 @@ final class EventTap: ObservableObject {
         let cfg = Config.shared
         let mapping: GestureMapping
         switch keyCode {
-        case NX_KEYTYPE_PLAY:     mapping = cfg.single
-        case NX_KEYTYPE_NEXT:     mapping = cfg.double
-        case NX_KEYTYPE_PREVIOUS: mapping = cfg.triple
+        case NX_KEYTYPE_PLAY:       mapping = cfg.single
+        case NX_KEYTYPE_NEXT:       mapping = cfg.double
+        case NX_KEYTYPE_PREVIOUS:   mapping = cfg.triple
+        case NX_KEYTYPE_SOUND_UP:   mapping = cfg.volumeUp
+        case NX_KEYTYPE_SOUND_DOWN: mapping = cfg.volumeDown
         default: return Unmanaged.passUnretained(event)
         }
         guard mapping.enabled, let choice = keyChoice(mapping.keyChoiceId) else {
+            // 该手势未启用，让原事件通过（音量键继续控制系统音量、play/pause 继续走默认）
             return Unmanaged.passUnretained(event)
         }
         if isKeyDown {
@@ -394,6 +413,12 @@ struct ContentView: View {
             MappingRow(label: "单击", mapping: $config.single)
             MappingRow(label: "双击", mapping: $config.double)
             MappingRow(label: "三击", mapping: $config.triple)
+            MappingRow(label: "音量+", mapping: $config.volumeUp)
+            MappingRow(label: "音量-", mapping: $config.volumeDown)
+            if config.volumeUp.enabled || config.volumeDown.enabled {
+                Text("⚠️ 启用音量键映射后，AirPods 将无法用来调系统音量")
+                    .font(.caption2).foregroundColor(.orange)
+            }
 
             HStack {
                 Spacer()
@@ -418,7 +443,7 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("说明：单/双/三击 AirPods 触发对应映射键。「点按」=按一下立刻松开；「按住」=按一下按住、再按一下释放（适合 Typeless 长按 Opt 录音）。")
+            Text("说明：单/双/三击 + 音量+/- 触发对应映射键。「点按」=按一下立刻松开；「按住」=按一下按住、再按一下释放（适合 Typeless 长按 Opt 录音）。音量键默认关闭，开启后会失去 AirPods 调音量能力。")
                 .font(.caption2).foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -525,7 +550,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 当前映射快览
         let cfg = Config.shared
-        for (label, m) in [("单击", cfg.single), ("双击", cfg.double), ("三击", cfg.triple)] {
+        for (label, m) in [("单击", cfg.single), ("双击", cfg.double), ("三击", cfg.triple),
+                           ("音量+", cfg.volumeUp), ("音量-", cfg.volumeDown)] {
             let title: String = {
                 if !m.enabled { return "\(label)：— 关闭" }
                 let key = keyChoice(m.keyChoiceId)?.label ?? "?"
@@ -612,7 +638,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.2
+            版本 1.3
             """
         alert.runModal()
     }

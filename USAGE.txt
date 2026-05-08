@@ -1,4 +1,4 @@
-AirPods Remap — 使用说明（v1.2）
+AirPods Remap — 使用说明（v1.3）
 
 【兼容性】
 ✅ AirPods（普通版）/ AirPods 3 / 4 — 单击/双击/三击 stem 都能拦截
@@ -37,6 +37,7 @@ AirPods Remap — 使用说明（v1.2）
 
 【支持的手势】
 单击 / 双击 / 三击（AirPods Pro 是单/双/三捏 force sensor）
+音量+ / 音量-（AirPods Pro 2 stem 上下滑 — 默认关闭，开启后会失去 AirPods 调音量能力）
 长按由系统占用（Siri / 降噪切换），无法拦截
 
 【卸载】
