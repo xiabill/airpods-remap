@@ -684,7 +684,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.3.3
+            版本 1.4.0
             """
         alert.runModal()
     }

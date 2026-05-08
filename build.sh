@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 APP_NAME="AirPodsRemap"
 APP_BUNDLE="${APP_NAME}.app"
 BUNDLE_ID="com.xiabill.airpods-remap"
-VERSION="1.3.3"
+VERSION="1.4.0"
 
 # 1. 确保图标存在；不存在则现做
 if [[ ! -f AppIcon.icns ]]; then
@@ -68,9 +68,16 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-# 6. ad-hoc 签名（让辅助功能权限在重编后能保留）
-echo "→ ad-hoc 签名…"
-codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null
+# 6. 签名：优先用 self-signed code signing 证书（让辅助功能权限在重编后稳定保留）
+#    找不到时 fallback 到 ad-hoc。先跑 ./setup-codesign.sh 一次创建证书。
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-AirPodsRemap Self-Signed}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "\"${SIGNING_IDENTITY}\""; then
+    echo "→ 用 self-signed 证书签名（${SIGNING_IDENTITY}）…"
+    codesign --force --deep --sign "${SIGNING_IDENTITY}" "$APP_BUNDLE" >/dev/null
+else
+    echo "→ ad-hoc 签名（未找到 \"${SIGNING_IDENTITY}\"；要稳定权限请跑 ./setup-codesign.sh）…"
+    codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null
+fi
 
 # 7. 移除可能存在的隔离属性（本地构建一般不会有）
 xattr -dr com.apple.quarantine "$APP_BUNDLE" 2>/dev/null || true

@@ -61,11 +61,25 @@
 ```bash
 git clone https://github.com/xiabill/airpods-remap.git
 cd airpods-remap
+
+# (强烈推荐，一次性) 创建本地 self-signed code signing 证书
+# 让以后任何 ./build.sh 之后辅助功能权限不再失效
+./setup-codesign.sh
+
 ./build.sh                                  # 生成 AirPodsRemap.app
 open AirPodsRemap.app
 ```
 
-第一次运行后同样要在系统设置里授权辅助功能，然后重启 app。
+第一次运行后在系统设置里授权辅助功能，然后重启 app。**之后再 `./build.sh` 多少次权限都保留**（前提是跑过 setup-codesign.sh）。
+
+#### 为什么要 setup-codesign.sh？
+
+macOS 的 TCC（辅助功能权限数据库）用 app 的 **designated requirement** 作为身份键：
+
+- **ad-hoc 签名**（默认 fallback，`codesign --sign -`）→ DR 包含 binary cdhash，重 build 后 hash 变 → DR 变 → TCC 视作新 app → 权限失效
+- **self-signed 证书签名** → DR 包含证书指纹（不变）→ 重 build 后 hash 变但 DR 不变 → 权限保留
+
+`setup-codesign.sh` 用 OpenSSL 生成一个 10 年有效期的本地证书，导入登录钥匙串并标记为 codeSign 信任。**只在一台电脑上跑一次**。从此 `build.sh` 自动检测并优先用这个证书签名；没找到则 fallback 到 ad-hoc。
 
 ---
 
@@ -122,7 +136,13 @@ open AirPodsRemap.app
 
 ### 重新构建 (`./build.sh`) 后权限失效
 
-ad-hoc 签名每次 build 后 hash 变化，macOS 视作新 app。要么重新授权一次，要么用稳定的 self-signed 证书签名（[贡献欢迎](#贡献)）。
+如果你**没跑过** `setup-codesign.sh`，那是 ad-hoc 签名每次 build 后 hash 变化导致的，重新授权一次即可。**长期解决**：在源码目录下跑：
+
+```bash
+./setup-codesign.sh    # 一次性
+```
+
+之后再 `./build.sh` 多少次都不会失效（详见上方「方式 B：从源码构建」）。
 
 ### 暂停 / 退出后 Opt 卡住怎么办
 
@@ -209,7 +229,8 @@ swallow 原始事件（return nil）
 ├── AirPodsRemap.swift     源码（单文件 SwiftUI app）
 ├── AppIcon.icns           应用图标
 ├── make-icon.swift        图标生成脚本（首次构建时用）
-├── build.sh               编译 universal binary（arm64 + x86_64）+ ad-hoc 签名
+├── setup-codesign.sh      一次性创建 self-signed code signing 证书
+├── build.sh               编译 universal binary（arm64 + x86_64）+ 签名
 ├── make-dmg.sh            打包 .dmg
 ├── package.sh             一键生成 dmg + zip
 ├── USAGE.txt              使用说明（dmg/zip 里的简版）
@@ -232,7 +253,7 @@ swallow 原始事件（return nil）
 
 1. **AirPods Pro 2 / Pro 3 完全不支持**（包括音量键，详见上方）
 2. **长按手势无法拦截** —— 系统占用做 Siri / 降噪切换
-3. **每次重新 `./build.sh` 后辅助功能权限会失效** —— ad-hoc 签名固有问题，需要重新授权
+3. **每次重新 `./build.sh` 后辅助功能权限会失效** —— ad-hoc 签名固有问题；跑一次 `./setup-codesign.sh` 切到 self-signed 证书后永久解决
 4. **配对到 Mac 后**，AirPods 单击 stem 在其他设备（iPhone / Apple TV）上的行为不变；只是 macOS 内的事件被拦截
 
 ---
@@ -241,7 +262,8 @@ swallow 原始事件（return nil）
 
 欢迎 PR！特别是这些方向：
 
-- [ ] 加 self-signed 证书或 Developer ID 签名，避免每次 build 后权限失效
+- [x] ~~加 self-signed 证书签名~~ (v1.4.0 已加，跑 `./setup-codesign.sh`)
+- [ ] 用付费 Apple Developer ID 做 codesign + notarize，让普通用户下载 dmg 时不再被 macOS 拦下
 - [ ] 加 GitHub Actions 自动构建 release
 - [ ] AirPods 连接状态实时显示在状态栏
 - [ ] 加可选「双击/三击」预设快捷键（截图、Spotlight 等）
