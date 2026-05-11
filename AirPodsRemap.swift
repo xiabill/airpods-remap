@@ -34,10 +34,12 @@ let keyChoices: [KeyChoice] = [
     .init(id: "f19", label: "F19", keyCode:  80, flags: 0),
     .init(id: "f20", label: "F20", keyCode:  90, flags: 0),
 
-    .init(id: "space",  label: "Space 空格",       keyCode: 49, flags: 0),
-    .init(id: "return", label: "Return / Enter ↵", keyCode: 36, flags: 0),
-    .init(id: "esc",    label: "Escape",           keyCode: 53, flags: 0),
-    .init(id: "tab",    label: "Tab",              keyCode: 48, flags: 0),
+    .init(id: "space",   label: "Space 空格",         keyCode: 49,  flags: 0),
+    .init(id: "return",  label: "Return / Enter ↵",   keyCode: 36,  flags: 0),
+    .init(id: "esc",     label: "Escape",             keyCode: 53,  flags: 0),
+    .init(id: "tab",     label: "Tab",                keyCode: 48,  flags: 0),
+    .init(id: "delete",  label: "Delete ⌫ (退格)",    keyCode: 51,  flags: 0),  // 笔记本主键盘上的 Delete 键
+    .init(id: "fwddel",  label: "Forward Delete ⌦",   keyCode: 117, flags: 0),  // 外接键盘的 Delete 或 Fn+Delete
 
     // 数字键 0–9
     .init(id: "n1", label: "1", keyCode: 18, flags: 0),
@@ -535,6 +537,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in self?.updateIconAlpha() }
             .store(in: &cancellables)
 
+        // 监听系统亮/暗主题切换，强制刷新图标确保 template 渲染跟得上
+        DistributedNotificationCenter.default.addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.updateIconAlpha() }
+
         // Popover
         popover = NSPopover()
         popover.behavior = .transient
@@ -543,8 +551,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateIconAlpha() {
         let tap = EventTap.shared
-        statusItem?.button?.alphaValue = tap.isRunning ? 1.0 : 0.4
-        statusItem?.button?.contentTintColor = tap.holdingCount > 0 ? .systemRed : nil
+        guard let button = statusItem?.button else { return }
+        button.alphaValue = tap.isRunning ? 1.0 : 0.4
+        // 每次都重新赋值 image 并 isTemplate=true，避免之前 contentTintColor 残留
+        // 导致状态栏在亮/暗主题切换时图标颜色不跟随系统的问题。
+        let img = NSImage(systemSymbolName: "earbuds", accessibilityDescription: "AirPods Remap")
+        img?.isTemplate = true
+        button.image = img
+        button.contentTintColor = tap.holdingCount > 0 ? .systemRed : nil
     }
 
     @objc private func handleStatusClick(_ sender: NSStatusBarButton) {
@@ -684,7 +698,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.4.0
+            版本 1.4.1
             """
         alert.runModal()
     }
