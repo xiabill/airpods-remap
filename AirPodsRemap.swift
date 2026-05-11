@@ -53,16 +53,33 @@ let keyChoices: [KeyChoice] = [
     .init(id: "n9", label: "9", keyCode: 25, flags: 0),
     .init(id: "n0", label: "0", keyCode: 29, flags: 0),
 
-    .init(id: "cmd-space",   label: "⌘ Space (Spotlight)",
-          keyCode: 49, flags: UInt64(CGEventFlags.maskCommand.rawValue)),
-    .init(id: "cmd-tab",     label: "⌘ Tab (App 切换)",
-          keyCode: 48, flags: UInt64(CGEventFlags.maskCommand.rawValue)),
-    .init(id: "cmd-shift-3", label: "⌘⇧3 (全屏截图)",
-          keyCode: 20, flags: UInt64(CGEventFlags.maskCommand.rawValue | CGEventFlags.maskShift.rawValue)),
-    .init(id: "cmd-shift-4", label: "⌘⇧4 (区域截图)",
-          keyCode: 21, flags: UInt64(CGEventFlags.maskCommand.rawValue | CGEventFlags.maskShift.rawValue)),
-    .init(id: "cmd-shift-5", label: "⌘⇧5 (截图工具)",
-          keyCode: 23, flags: UInt64(CGEventFlags.maskCommand.rawValue | CGEventFlags.maskShift.rawValue)),
+    // 字母键 a–z（用于组合 ⌘V / ⌘C / ⌘W 等）
+    .init(id: "kA", label: "A", keyCode:  0, flags: 0),
+    .init(id: "kB", label: "B", keyCode: 11, flags: 0),
+    .init(id: "kC", label: "C", keyCode:  8, flags: 0),
+    .init(id: "kD", label: "D", keyCode:  2, flags: 0),
+    .init(id: "kE", label: "E", keyCode: 14, flags: 0),
+    .init(id: "kF", label: "F", keyCode:  3, flags: 0),
+    .init(id: "kG", label: "G", keyCode:  5, flags: 0),
+    .init(id: "kH", label: "H", keyCode:  4, flags: 0),
+    .init(id: "kI", label: "I", keyCode: 34, flags: 0),
+    .init(id: "kJ", label: "J", keyCode: 38, flags: 0),
+    .init(id: "kK", label: "K", keyCode: 40, flags: 0),
+    .init(id: "kL", label: "L", keyCode: 37, flags: 0),
+    .init(id: "kM", label: "M", keyCode: 46, flags: 0),
+    .init(id: "kN", label: "N", keyCode: 45, flags: 0),
+    .init(id: "kO", label: "O", keyCode: 31, flags: 0),
+    .init(id: "kP", label: "P", keyCode: 35, flags: 0),
+    .init(id: "kQ", label: "Q", keyCode: 12, flags: 0),
+    .init(id: "kR", label: "R", keyCode: 15, flags: 0),
+    .init(id: "kS", label: "S", keyCode:  1, flags: 0),
+    .init(id: "kT", label: "T", keyCode: 17, flags: 0),
+    .init(id: "kU", label: "U", keyCode: 32, flags: 0),
+    .init(id: "kV", label: "V", keyCode:  9, flags: 0),
+    .init(id: "kW", label: "W", keyCode: 13, flags: 0),
+    .init(id: "kX", label: "X", keyCode:  7, flags: 0),
+    .init(id: "kY", label: "Y", keyCode: 16, flags: 0),
+    .init(id: "kZ", label: "Z", keyCode:  6, flags: 0),
 ]
 
 func keyChoice(_ id: String) -> KeyChoice? {
@@ -76,24 +93,58 @@ enum MappingMode: String, Codable, CaseIterable {
     case holdToggle   // 按一下按住，再按一下释放（适合长按型快捷键，如 Typeless 的 Opt 录音）
 }
 
+/// 一个手势可以映射到 1 到 N 个按键（chord，组合键）。
+/// 触发时按 keys 数组顺序「同时按下」（先按下、再逆序释放），系统看到的修饰键状态会正确累加。
 struct GestureMapping: Codable, Equatable {
     var enabled: Bool
-    var keyChoiceId: String
+    var keys: [String]      // 按键 ID 数组，按数组顺序按下；空数组等同未配置
     var mode: MappingMode
 
-    init(enabled: Bool, keyChoiceId: String, mode: MappingMode = .tap) {
+    init(enabled: Bool = false, keys: [String] = [], mode: MappingMode = .tap) {
         self.enabled = enabled
-        self.keyChoiceId = keyChoiceId
+        self.keys = keys
         self.mode = mode
     }
 
-    enum CodingKeys: String, CodingKey { case enabled, keyChoiceId, mode }
+    enum CodingKeys: String, CodingKey {
+        case enabled, keys, mode
+        case keyChoiceId   // v1.x 旧字段，仅用于读迁移（写不输出）
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        enabled     = try c.decode(Bool.self, forKey: .enabled)
-        keyChoiceId = try c.decode(String.self, forKey: .keyChoiceId)
-        mode        = (try? c.decode(MappingMode.self, forKey: .mode)) ?? .tap
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        mode    = (try? c.decode(MappingMode.self, forKey: .mode)) ?? .tap
+
+        if let arr = try? c.decode([String].self, forKey: .keys) {
+            keys = arr
+        } else if let oldId = try? c.decode(String.self, forKey: .keyChoiceId) {
+            // v1.x 单键配置自动迁移到数组形式
+            keys = Self.migrate(oldId: oldId)
+        } else {
+            keys = []
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(enabled, forKey: .enabled)
+        try c.encode(keys, forKey: .keys)
+        try c.encode(mode, forKey: .mode)
+        // 不写 keyChoiceId（v2.0 已弃用，仅用于读旧配置）
+    }
+
+    /// v1.x → v2.0 迁移：把单值 keyChoiceId 转成 keys 数组。
+    /// 预设组合键拆成独立按键序列。
+    private static func migrate(oldId: String) -> [String] {
+        switch oldId {
+        case "cmd-space":   return ["lcmd", "space"]
+        case "cmd-tab":     return ["lcmd", "tab"]
+        case "cmd-shift-3": return ["lcmd", "lshift", "n3"]
+        case "cmd-shift-4": return ["lcmd", "lshift", "n4"]
+        case "cmd-shift-5": return ["lcmd", "lshift", "n5"]
+        default:            return [oldId]
+        }
     }
 }
 
@@ -110,11 +161,11 @@ final class Config: ObservableObject {
 
     private init() {
         // 默认：单击 = 按住 Opt（用于 Typeless：按一下开始录音，再按一下结束）
-        var s = GestureMapping(enabled: true,  keyChoiceId: "lopt", mode: .holdToggle)
-        var d = GestureMapping(enabled: false, keyChoiceId: "f14")
-        var t = GestureMapping(enabled: false, keyChoiceId: "f15")
-        var vu = GestureMapping(enabled: false, keyChoiceId: "f16")
-        var vd = GestureMapping(enabled: false, keyChoiceId: "f17")
+        var s = GestureMapping(enabled: true,  keys: ["lopt"], mode: .holdToggle)
+        var d = GestureMapping(enabled: false, keys: ["f14"])
+        var t = GestureMapping(enabled: false, keys: ["f15"])
+        var vu = GestureMapping(enabled: false, keys: ["f16"])
+        var vd = GestureMapping(enabled: false, keys: ["f17"])
         if let data = UserDefaults.standard.data(forKey: storeKey),
            let dict = try? JSONDecoder().decode([String: GestureMapping].self, from: data) {
             if let v = dict["single"]     { s = v }
@@ -141,11 +192,11 @@ final class Config: ObservableObject {
     }
 
     func resetToDefaults() {
-        single = GestureMapping(enabled: true,  keyChoiceId: "lopt", mode: .holdToggle)
-        double = GestureMapping(enabled: false, keyChoiceId: "f14")
-        triple = GestureMapping(enabled: false, keyChoiceId: "f15")
-        volumeUp   = GestureMapping(enabled: false, keyChoiceId: "f16")
-        volumeDown = GestureMapping(enabled: false, keyChoiceId: "f17")
+        single = GestureMapping(enabled: true,  keys: ["lopt"], mode: .holdToggle)
+        double = GestureMapping(enabled: false, keys: ["f14"])
+        triple = GestureMapping(enabled: false, keys: ["f15"])
+        volumeUp   = GestureMapping(enabled: false, keys: ["f16"])
+        volumeDown = GestureMapping(enabled: false, keys: ["f17"])
     }
 }
 
@@ -179,7 +230,7 @@ final class EventTap: ObservableObject {
     @Published private(set) var holdingCount = 0   // 当前处于 hold 状态的映射数（>0 时图标变红）
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var holdingKeys: [Int32: (UInt16, UInt64)] = [:]   // 触发源 keyCode -> (目标 keyCode, flags)
+    private var holdingChords: [Int32: [String]] = [:]   // 触发源 keyCode -> 已按下的 chord（按键 ID 顺序）
 
     func hasPermission(prompt: Bool = false) -> Bool {
         let opts = [
@@ -268,40 +319,83 @@ final class EventTap: ObservableObject {
         case NX_KEYTYPE_SOUND_DOWN: mapping = cfg.volumeDown
         default: return Unmanaged.passUnretained(event)
         }
-        guard mapping.enabled, let choice = keyChoice(mapping.keyChoiceId) else {
-            // 该手势未启用，让原事件通过（音量键继续控制系统音量、play/pause 继续走默认）
+        guard mapping.enabled, !mapping.keys.isEmpty else {
+            // 该手势未启用或未配置按键，让原事件通过
             return Unmanaged.passUnretained(event)
         }
         if isKeyDown {
             switch mapping.mode {
             case .tap:
-                postKeyDown(keyCode: choice.keyCode, flags: choice.flags)
-                postKeyUp(keyCode: choice.keyCode, flags: choice.flags)
+                postChordDown(keyIds: mapping.keys)
+                postChordUp(keyIds: mapping.keys)
             case .holdToggle:
-                if holdingKeys[keyCode] != nil {
-                    postKeyUp(keyCode: choice.keyCode, flags: choice.flags)
-                    holdingKeys.removeValue(forKey: keyCode)
+                if let chord = holdingChords[keyCode] {
+                    // 已按住，释放整个 chord
+                    postChordUp(keyIds: chord)
+                    holdingChords.removeValue(forKey: keyCode)
                 } else {
-                    postKeyDown(keyCode: choice.keyCode, flags: choice.flags)
-                    holdingKeys[keyCode] = (choice.keyCode, choice.flags)
+                    // 按下整个 chord 并记录
+                    postChordDown(keyIds: mapping.keys)
+                    holdingChords[keyCode] = mapping.keys
                 }
                 DispatchQueue.main.async { [weak self] in
-                    self?.holdingCount = self?.holdingKeys.count ?? 0
+                    self?.holdingCount = self?.holdingChords.count ?? 0
                 }
             }
         }
         return nil
     }
 
-    /// 释放所有处于 hold 状态的键，防止 Opt 等修饰键卡住。
+    /// 释放所有处于 hold 状态的 chord，防止修饰键卡住。
     /// 在 stop()、quit、配置切换时调用。
     func releaseAllHeld() {
-        for (_, (keyCode, flags)) in holdingKeys {
-            postKeyUp(keyCode: keyCode, flags: flags)
+        for (_, chord) in holdingChords {
+            postChordUp(keyIds: chord)
         }
-        holdingKeys.removeAll()
+        holdingChords.removeAll()
         DispatchQueue.main.async { [weak self] in
             self?.holdingCount = 0
+        }
+    }
+
+    /// 按数组顺序 post 一组按键的 keyDown，每步事件的 flags 累加已按下的修饰键 mask。
+    /// 例如 [lcmd, lshift, kV] 会得到：
+    ///   1. lcmd↓  flags=⌘
+    ///   2. lshift↓ flags=⌘⇧
+    ///   3. kV↓    flags=⌘⇧
+    /// （postKeyDown 内部会再把当前键自己的 mod mask 加到 flags 上，所以这里 base flags 只传"之前累计"。）
+    private func postChordDown(keyIds: [String]) {
+        var accumulated: CGEventFlags = []
+        for id in keyIds {
+            guard let choice = keyChoice(id) else { continue }
+            // base flags 用 choice.flags（通常为 0）+ 累计 modifier
+            let baseFlags = CGEventFlags(rawValue: choice.flags).union(accumulated)
+            postKeyDown(keyCode: choice.keyCode, flags: baseFlags.rawValue)
+            if let mod = modifierKeyMask[choice.keyCode] {
+                accumulated.insert(mod)
+            }
+        }
+    }
+
+    /// 逆序释放 chord 的 keyUp。每释放一个 modifier，从累计 flags 移除它。
+    /// 顺序：先释放 base key（最后按下的），最后释放最先按下的 modifier。
+    private func postChordUp(keyIds: [String]) {
+        // 先算出 chord 全部按下后的累计 modifier mask
+        var accumulated: CGEventFlags = []
+        for id in keyIds {
+            if let choice = keyChoice(id), let mod = modifierKeyMask[choice.keyCode] {
+                accumulated.insert(mod)
+            }
+        }
+        // 逆序逐个释放
+        for id in keyIds.reversed() {
+            guard let choice = keyChoice(id) else { continue }
+            // 这个键释放后，accumulated 应去掉它的 mod
+            if let mod = modifierKeyMask[choice.keyCode] {
+                accumulated.remove(mod)
+            }
+            let baseFlags = CGEventFlags(rawValue: choice.flags).union(accumulated)
+            postKeyUp(keyCode: choice.keyCode, flags: baseFlags.rawValue)
         }
     }
 
@@ -372,28 +466,71 @@ struct MappingRow: View {
     @Binding var mapping: GestureMapping
 
     var body: some View {
-        HStack(spacing: 8) {
-            Toggle(isOn: $mapping.enabled) {
-                Text(label).frame(width: 40, alignment: .leading)
-            }
-            .toggleStyle(.checkbox)
-
-            Picker("", selection: $mapping.keyChoiceId) {
-                ForEach(keyChoices) { c in
-                    Text(c.label).tag(c.id)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Toggle(isOn: $mapping.enabled) {
+                    Text(label).frame(width: 40, alignment: .leading)
                 }
-            }
-            .labelsHidden()
-            .disabled(!mapping.enabled)
+                .toggleStyle(.checkbox)
 
-            Picker("", selection: $mapping.mode) {
-                Text("点按").tag(MappingMode.tap)
-                Text("按住").tag(MappingMode.holdToggle)
+                Spacer()
+
+                Picker("", selection: $mapping.mode) {
+                    Text("点按").tag(MappingMode.tap)
+                    Text("按住").tag(MappingMode.holdToggle)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 110)
+                .disabled(!mapping.enabled)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 110)
-            .disabled(!mapping.enabled)
+
+            // 按键列表（chord 的每个按键独立一行）
+            ForEach(Array(mapping.keys.enumerated()), id: \.offset) { idx, _ in
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.turn.down.right")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .frame(width: 40, alignment: .trailing)
+                    Picker("", selection: Binding(
+                        get: {
+                            idx < mapping.keys.count ? mapping.keys[idx] : "lopt"
+                        },
+                        set: { newValue in
+                            if idx < mapping.keys.count { mapping.keys[idx] = newValue }
+                        }
+                    )) {
+                        ForEach(keyChoices) { c in
+                            Text(c.label).tag(c.id)
+                        }
+                    }
+                    .labelsHidden()
+                    Button {
+                        if idx < mapping.keys.count { mapping.keys.remove(at: idx) }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .help("移除这个按键")
+                }
+                .disabled(!mapping.enabled)
+            }
+
+            HStack(spacing: 4) {
+                Spacer().frame(width: 44)
+                Button {
+                    // 默认追加一个 Left Option（避免空 picker）
+                    mapping.keys.append("lopt")
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle")
+                        Text(mapping.keys.isEmpty ? "选择按键" : "添加按键（组合）")
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .disabled(!mapping.enabled)
+            }
         }
     }
 }
@@ -607,8 +744,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            ("音量+", cfg.volumeUp), ("音量-", cfg.volumeDown)] {
             let title: String = {
                 if !m.enabled { return "\(label)：— 关闭" }
-                let key = keyChoice(m.keyChoiceId)?.label ?? "?"
-                return "\(label)： \(key)"
+                if m.keys.isEmpty { return "\(label)：— 未配置按键" }
+                let names = m.keys.compactMap { keyChoice($0)?.label }
+                return "\(label)： \(names.joined(separator: " + "))"
             }()
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.isEnabled = false
@@ -698,7 +836,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             • 左键状态栏图标 → 配置面板
             • 右键状态栏图标 → 快捷菜单
 
-            版本 1.4.1
+            版本 2.0.0
             """
         alert.runModal()
     }
