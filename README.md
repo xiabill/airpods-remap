@@ -1,5 +1,7 @@
 # AirPods Remap
 
+> 💡 **如果你同时也用 2.4G 遥控键盘，推荐装合并版 [xiabill/VibeHub](https://github.com/xiabill/VibeHub)** —— 一个 binary、一份权限、两个 Tab。本仓库继续维护，只想要 AirPods 映射的用户继续装这个就行。
+
 把 AirPods 的 **单击 / 双击 / 三击 / 音量+ / 音量-** 手势映射到任意键盘按键的 macOS 菜单栏小工具。专为搭配 [Typeless](https://typeless.dev/) / [WhisperKey](https://whisperkey.app/) 这类「按住 Opt 录音」的 AI 输入工具设计 —— 戴着 AirPods 单击一下就开录，再单击一下就上文字。
 
 > **代码完全由 [Claude Code](https://claude.com/claude-code) 写就。** 我（仓库主人）只是把需求讲给 Claude，所有实现、调试、文档、打包都是它做的。
@@ -14,8 +16,26 @@
 | AirPods Max | ✅ 全部工作 | 同普通版 |
 | AirPods Pro 1 | ⚠️ 待测试 | 理论上和普通版一样 |
 | **AirPods Pro 2 / Pro 3** | ❌ **不支持**（实测确认） | Apple 把 Pro 2 的 stem 事件**全部**路由到 MediaRemote 私有 IPC，**包括音量+/- 也拦不到**。v1.3 曾推测音量键能在 Pro 2 工作（理论上音量必须走公开路径），但用户实测仍然失败。第三方工具完全束手无策，Karabiner-Elements、SiriMote 都一样失效。 |
+| **其他蓝牙耳机**（小米 / 华为 / 索尼 / Bose / Jabra / 漫步者 / 杂牌 TWS 等） | ✅ 部分手势可用 | Play/Pause 和音量+/- 全芯片通用；"下一曲"多数可用；"上一曲"多数拦不到。详见下方「非 Apple 耳机的逐手势兼容性」 |
 
 **Pro 2 / Pro 3 用户的现实**：本项目（以及任何同类工具）在 macOS 上**完全无法**拦截 Pro 2 的 stem 事件。详见下方「为什么 Pro 2 不工作」。
+
+### 非 Apple 耳机的逐手势兼容性
+
+只要耳机走标准蓝牙 AVRCP 协议接入 macOS（绝大多数都是），事件会经过同一条 `NSSystemDefined` 公开通道，**和芯片厂商无关**（Qualcomm / Airoha / Realtek / 恒玄 BES / Jieli / 华为麒麟 A2 / 索尼 V1 等都一样）。能否映射取决于三件事：①耳机把哪些按钮映射成了 AVRCP 命令；②macOS 把该 AVRCP 命令对应到哪个 `NX_KEYTYPE` keyCode；③当前代码识别哪些 keyCode。
+
+| AirPodsRemap 中的手势 | 非 Apple 耳机 | 解释 |
+|---|---|---|
+| **单击 = Play/Pause** | ✅ 全芯片可用 | AVRCP `PLAY/PAUSE` → `NX_KEYTYPE_PLAY (16)`，所有蓝牙耳机的标准命令 |
+| **音量+ / 音量-** | ✅ 全芯片可用 | AVRCP `VOL_UP/DOWN` → `NX_KEYTYPE_SOUND_UP/DOWN (0/1)`，标准命令 |
+| **双击 = 下一曲** | ✅ 大部分可用 | AVRCP `TRACK_NEXT` → `NX_KEYTYPE_NEXT (17)`。前提是耳机本身有"下一曲"手势并走 AVRCP |
+| **三击 = 上一曲** | ⚠️ 多数拦不到 | AirPods 三击发的是 `NX_KEYTYPE_FAST (19)`；非 Apple 耳机的"上一曲"按钮通常发 `NX_KEYTYPE_PREVIOUS (18)`。当前版本只识别 19，所以 18 这条收不到（后续版本可能补上） |
+
+**经验法则**：
+
+- 按耳机按钮时 macOS 顶部能弹出播放/音量 HUD → AirPodsRemap 基本能拦到（"上一曲"按钮除外）
+- 耳机厂商定义的「长按 = Siri / 降噪切换 / 重新配对」走系统专用路由 → **拦不到**
+- 不同芯片厂商的差异**不在拦截层**，而在「耳机自身把哪些按钮做成了哪种 AVRCP 命令」 —— 这是耳机固件决定的，与 macOS 这边的实现无关
 
 ---
 
